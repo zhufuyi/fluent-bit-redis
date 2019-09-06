@@ -1,0 +1,90 @@
+version: '3'
+
+services:
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:7.2.0
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTIC_PASSWORD=elastic
+      - xpack.security.enabled=true 
+      - http.cors.enabled=true 
+      - http.cors.allow-origin="*"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - eflk-net
+
+  kibana:
+    container_name: kibana
+    image: kibana:7.2.0
+    restart: always
+    environment:
+      SERVER_NAME: kibana
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: elastic
+    ports:
+      - "5601:5601"
+    depends_on: 
+      - elasticsearch
+    networks: 
+      - eflk-net
+
+  redis:
+    image: redis:latest
+    restart: always
+    container_name: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+    - 6379:6379
+    volumes:
+    - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    - redis-data:/data
+    networks: 
+      - eflk-net
+
+  fluent-bit:
+    image: zhufuyi/fluent-bit-redis:1.2.2
+    container_name: fluent-bit
+    restart: always
+    volumes:
+      - ./fluent-bit/config/:/fluent-bit/etc/
+      - /var/lib/docker/containers:/var/lib/docker/containers
+    depends_on:
+      - redis
+    networks: 
+      - eflk-net
+
+  logstash:
+    image: logstash:7.2.0
+    restart: always
+    container_name: logstash
+    ports:
+    - 5000:5000
+    - 9600:9600
+    volumes:
+    - ./logstash/logstash.yml:/usr/share/logstash/config/logstash.yml
+    - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - redis
+      - elasticsearch
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks: 
+      - eflk-net
+
+volumes:
+  es-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  eflk-net:
+    driver: bridge

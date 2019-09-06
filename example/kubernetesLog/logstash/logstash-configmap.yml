@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-pipline-config
+  namespace: logging
+data:
+  logstash.conf: |-
+    input {
+        redis {
+            # change redis info
+            data_type => "list"
+            key => "logstash"
+            host => "xxxxxx"
+            password => "xxxxxxx"
+            port => "6379"
+            db => "0"
+        }
+    }
+
+    output {
+        elasticsearch {
+            # change elasticsearch info
+            hosts => "localhost:9200"
+            user => "elastic"
+            password => "elastic"
+            index => "logstash-%{+YYYY.MM.dd}"
+        }
+    }
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: logging
+data:
+  logstash.yml: |-
+    http.host: "0.0.0.0"
+    # change elasticsearch info
+    xpack.monitoring.elasticsearch.hosts: [ "http://vpc-dev-wq-es-6gaqz2p7tzxvyvyyrkiw3drlb4.ap-northeast-1.es.amazonaws.com:80" ]
+    # is need auth，true:yes，false:no
+    xpack.monitoring.enabled: false
+    xpack.monitoring.elasticsearch.username: elastic
+    xpack.monitoring.elasticsearch.password: elastic
+
+  jvm.options: |-
+    ## JVM configuration
+
+    # Xms represents the initial size of total heap space
+    # Xmx represents the maximum size of total heap space
+    -Xms1g
+    -Xmx1g
+
+    ## GC configuration
+    -XX:+UseConcMarkSweepGC
+    -XX:CMSInitiatingOccupancyFraction=75
+    -XX:+UseCMSInitiatingOccupancyOnly
+
+    ## Locale
+    # Set the locale language
+    #-Duser.language=en
+
+    # Set the locale country
+    #-Duser.country=US
+
+    # Set the locale variant, if any
+    #-Duser.variant=
+
+    ## basic
+
+    # set the I/O temp directory
+    #-Djava.io.tmpdir=$HOME
+
+    # set to headless, just in case
+    -Djava.awt.headless=true
+
+    # ensure UTF-8 encoding by default (e.g. filenames)
+    -Dfile.encoding=UTF-8
+
+    # use our provided JNA always versus the system one
+    #-Djna.nosys=true
+
+    # Turn on JRuby invokedynamic
+    -Djruby.compile.invokedynamic=true
+    # Force Compilation
+    -Djruby.jit.threshold=0
+
+    ## heap dumps
+
+    # generate a heap dump when an allocation from the Java heap fails
+    # heap dumps are created in the working directory of the JVM
+    -XX:+HeapDumpOnOutOfMemoryError
+
+    # specify an alternative path for heap dumps
+    # ensure the directory exists and has sufficient space
+    #-XX:HeapDumpPath=${LOGSTASH_HOME}/heapdump.hprof
+
+    ## GC logging
+    #-XX:+PrintGCDetails
+    #-XX:+PrintGCTimeStamps
+    #-XX:+PrintGCDateStamps
+    #-XX:+PrintClassHistogram
+    #-XX:+PrintTenuringDistribution
+    #-XX:+PrintGCApplicationStoppedTime
+
+    # log GC status to a file with time stamps
+    # ensure the directory exists
+    #-Xloggc:${LS_GC_LOG_FILE}
+
+    # Entropy source for randomness
+    -Djava.security.egd=file:/dev/urandom
+
+  log4j2.properties: |-
+    status = error
+    name = LogstashPropertiesConfig
+
+    appender.console.type = Console
+    appender.console.name = plain_console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = [%d{ISO8601}][%-5p][%-25c] %m%n
+
+    appender.json_console.type = Console
+    appender.json_console.name = json_console
+    appender.json_console.layout.type = JSONLayout
+    appender.json_console.layout.compact = true
+    appender.json_console.layout.eventEol = true
+
+    rootLogger.level = ${sys:ls.log.level}
+    rootLogger.appenderRef.console.ref = ${sys:ls.log.format}_console
+
+  pipelines.yml: |-
+    # This file is where you define your pipelines. You can define multiple.
+    # For more information on multiple pipelines, see the documentation:
+    #   https://www.elastic.co/guide/en/logstash/current/multiple-pipelines.html
+
+    - pipeline.id: main
+      path.config: "/usr/share/logstash/pipeline"
+
+  startup.options: |- 
+    # Override Java location
+    #JAVACMD=/usr/bin/java
+
+    # Set a home directory
+    LS_HOME=/usr/share/logstash
+
+    # logstash settings directory, the path which contains logstash.yml
+    LS_SETTINGS_DIR=/etc/logstash
+
+    # Arguments to pass to logstash
+    LS_OPTS="--path.settings ${LS_SETTINGS_DIR}"
+
+    # Arguments to pass to java
+    LS_JAVA_OPTS=""
+
+    # pidfiles aren't used the same way for upstart and systemd; this is for sysv users.
+    LS_PIDFILE=/var/run/logstash.pid
+
+    # user and group id to be invoked as
+    LS_USER=logstash
+    LS_GROUP=logstash
+
+    # Enable GC logging by uncommenting the appropriate lines in the GC logging
+    # section in jvm.options
+    LS_GC_LOG_FILE=/var/log/logstash/gc.log
+
+    # Open file limit
+    LS_OPEN_FILES=16384
+
+    # Nice level
+    LS_NICE=19
+
+    # Change these to have the init script named and described differently
+    # This is useful when running multiple instances of Logstash on the same
+    # physical box or vm
+    SERVICE_NAME="logstash"
+    SERVICE_DESCRIPTION="logstash"
+
+    # If you need to run a command or script before launching Logstash, put it
+    # between the lines beginning with `read` and `EOM`, and uncomment those lines.
+    ###
+    ## read -r -d '' PRESTART << EOM
+    ## EOM
+

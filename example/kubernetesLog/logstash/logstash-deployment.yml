@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash-dm
+  namespace: logging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      name: logstash-pod
+      labels:
+        app: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: logstash:7.2.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xmx512m -Xms512m"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+        volumeMounts:
+        - name: logstash-pipline-vl
+          mountPath:  /usr/share/logstash/pipeline
+          readOnly: true
+        - name: logstash-config-vl
+          mountPath:  /usr/share/logstash/config
+          readOnly: true
+      volumes:
+      - name: logstash-pipline-vl
+        configMap:
+          name: logstash-pipline-config
+      - name: logstash-config-vl
+        configMap:
+          name: logstash-config
+

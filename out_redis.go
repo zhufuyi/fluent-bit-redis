@@ -180,11 +180,11 @@ func bytes2string(record map[interface{}]interface{}) map[string]interface{} {
         case []byte:
 			// prevent encoding to base64
             m[k.(string)] = string(t)
-        default:
-            m[k.(string)] = v
         case map[interface{}]interface{}:
             m[k.(string)] = bytes2string(v.(map[interface{}]interface{}))
         }
+        default:
+            m[k.(string)] = v
     }
 
     return m
