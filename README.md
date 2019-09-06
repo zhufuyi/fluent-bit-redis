@@ -4,13 +4,13 @@
 
 一般采集日志量不大的时候，fluent-bit可以直接输出到elasticsearch就可以满足要求，当采集的日志量远超过写入elasticsearch，并且达到fluent-bit缓冲极限时，部分日志会被丢弃，为了解决这个问题，先把采集的日志写入缓冲区(kafka、redis等)，然后从缓冲区读取日志再写入elasticsearch，加入消息队列这种解耦方式解决了不同服务间传输数据的速度匹配问题。这里选用redis作为缓冲队列，在满足日志采集情况下，相对于kafka更加轻量。
 
-由于官方的fluent-bit不支持redis插件，github上有人使用go语言编写了fluent-bit的[redis插件](https://github.com/majst01/fluent-bit-go-redis-output)，可以用来采集节点和容器日志，但是用来采集kubernetes集群日志时，多级json的值出现了base64编码，不能直接查看原来的值,如下图所示：
+由于官方的fluent-bit不支持redis插件，在github上找到有人使用go语言编写的redis插件( https://github.com/majst01/fluent-bit-go-redis-output )，该项目是在官方fluent-bit镜像基础上新加入了redis插件，构建出新的镜像兼容官方镜像，可以用来采集节点、容器、nginx、kubernetes集群日志等，但使用redis插件有个显示上的小问题，当json日志有多层(2级以上)时，会出现base64编码，不能直接查看原来的值，如下图所示：
 
 ![kibana-view](kibana-view.jpg)
 
 <br>
 
-具体原因是go语言的json序列化时，[]byte类型自动使用了base64编码，而不是string，解决办法是数据在序列化前把[]byte类型统一转为string，具体实现如下
+具体原因是go语言的json序列化时，[]byte类型自动使用了base64编码，而不是string，而原项目中只把第一层的json中的[]byte类型数据转为string，多层json时没有处理，解决办法是数据在序列化前把[]byte类型统一转为string，具体实现如下：
 
 ```go
 func bytes2string(record map[interface{}]interface{}) map[string]interface{} {
